@@ -1,0 +1,23 @@
+{
+  "name": "webgl-3d-benchmark",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "node build.mjs",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.174.0",
+    "three-subdivide": "^1.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/three": "^0.174.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}

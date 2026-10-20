@@ -7,5 +7,11 @@
   "entry": "index.html",
   "icon": "icon.svg",
   "version": "3.0.0",
-  "scores": false
+  "scores": false,
+  "config": {
+    "defaultResolution": "auto",
+    "defaultShadow": "high",
+    "defaultSubdiv": 0,
+    "benchmarkDuration": 15
+  }
 }

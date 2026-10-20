@@ -1,0 +1,17 @@
+{
+  "mypc": 1,
+  "id": "webgl-3d-benchmark",
+  "name": "WebGL 3D Benchmark",
+  "description": "Interactive 3D WebGL stress test and GPU benchmark featuring procedural humanoid subdivision and real-time metrics",
+  "type": "app",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "version": "3.0.0",
+  "scores": false,
+  "config": {
+    "defaultResolution": "auto",
+    "defaultShadow": "high",
+    "defaultSubdiv": 0,
+    "benchmarkDuration": 15
+  }
+}

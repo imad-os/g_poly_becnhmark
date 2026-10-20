@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WebGL 3D Benchmark</title>
+  <meta name="description" content="Interactive 3D WebGL stress test and GPU benchmark featuring procedural humanoid subdivision and real-time metrics">
+  <meta property="og:title" content="WebGL 3D Benchmark">
+  <meta property="og:description" content="Interactive 3D WebGL stress test and GPU benchmark featuring procedural humanoid subdivision and real-time metrics">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="icon.svg?v={{VERSION}}">
+  <link rel="stylesheet" href="assets/style.css?v={{VERSION}}">
+</head>
+<body>
+  <!-- 3D Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Stats.js container -->
+  <div id="stats-container"></div>
+
+  <!-- Realtime Telemetry HUD -->
+  <div id="telemetry-bar">
+    <div class="metric-badge">
+      <span class="metric-label" id="i18n-res-label">Resolution</span>
+      <span class="metric-value" id="hud-res">1920×1080</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label" id="i18n-tris-label">Triangles</span>
+      <span class="metric-value" id="hud-tris">144</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label" id="i18n-verts-label">Vertices</span>
+      <span class="metric-value" id="hud-verts">288</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label" id="i18n-draws-label">Draw Calls</span>
+      <span class="metric-value" id="hud-draws">4</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label" id="i18n-level-label">Subdiv Level</span>
+      <span class="metric-value" id="hud-level">0</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label" id="i18n-pads-label">Controllers</span>
+      <span class="metric-value" id="hud-pads">0</span>
+    </div>
+  </div>
+
+  <!-- Sleek Dark Control Panel -->
+  <div id="control-panel">
+    <div class="panel-header">
+      <div class="header-title-box">
+        <h1><span id="i18n-title">WebGL Benchmark</span> <span class="status-tag">v{{VERSION}}</span></h1>
+        <div class="panel-subtitle" id="i18n-subtitle">Loop Subdivision &amp; Stress Engine</div>
+      </div>
+      <button id="btn-close-hud" class="btn-secondary ctrl-item" data-ctrl-type="action" title="Hide HUD" style="padding: 4px 8px;">✕</button>
+    </div>
+
+    <div class="panel-body">
+      <!-- Benchmark CTA -->
+      <button id="btn-start-benchmark" class="btn-benchmark ctrl-item" data-ctrl-type="action" tabindex="0">
+        <span id="i18n-run-bm">⚡ RUN BENCHMARK (15s)</span>
+      </button>
+
+      <!-- Section: Subdivision & Polygon Density -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span id="i18n-smoothing">Character Smoothing</span>
+          <span class="ctrl-sublabel" id="label-subdiv-level">Level 0 (Low-Poly)</span>
+        </div>
+        <input type="range" id="slider-subdiv" class="range-input ctrl-item" data-ctrl-type="range" min="0" max="4" step="1" value="0" tabindex="0">
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; direction:ltr;">
+          <span>L0</span>
+          <span>L1</span>
+          <span>L2</span>
+          <span>L3</span>
+          <span>L4</span>
+        </div>
+      </div>
+
+      <!-- Wireframe Toggle -->
+      <div class="toggle-row">
+        <span class="toggle-label" id="i18n-wireframe">Wireframe Mesh</span>
+        <div id="toggle-wireframe" class="toggle-switch ctrl-item" data-ctrl-type="toggle" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Character Material Finish -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span id="i18n-material">Material Surface</span>
+          <span class="ctrl-sublabel" id="label-mat">Cyber Cobalt</span>
+        </div>
+        <div class="swatch-row" id="swatch-group">
+          <button class="swatch-btn active ctrl-item" data-ctrl-type="swatch" data-mat="cobalt" style="background:#0284c7;" title="Cyber Cobalt"></button>
+          <button class="swatch-btn ctrl-item" data-ctrl-type="swatch" data-mat="stealth" style="background:#334155;" title="Dark Stealth"></button>
+          <button class="swatch-btn ctrl-item" data-ctrl-type="swatch" data-mat="gold" style="background:#f59e0b;" title="Titanium Gold"></button>
+          <button class="swatch-btn ctrl-item" data-ctrl-type="swatch" data-mat="emerald" style="background:#10b981;" title="Bio Emerald"></button>
+          <button class="swatch-btn ctrl-item" data-ctrl-type="swatch" data-mat="clay" style="background:#e2e8f0;" title="Matte Clay"></button>
+        </div>
+      </div>
+
+      <!-- Section: Display Resolution -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span id="i18n-resolution">Target Resolution</span>
+          <span class="ctrl-sublabel" id="label-res">Auto</span>
+        </div>
+        <div class="seg-row" id="seg-res">
+          <button class="seg-btn ctrl-item" data-ctrl-type="seg-res" data-res="480p">480p</button>
+          <button class="seg-btn ctrl-item" data-ctrl-type="seg-res" data-res="720p">720p</button>
+          <button class="seg-btn ctrl-item" data-ctrl-type="seg-res" data-res="1080p">1080p</button>
+          <button class="seg-btn active ctrl-item" data-ctrl-type="seg-res" data-res="auto">Auto</button>
+        </div>
+      </div>
+
+      <!-- Section: Shadow Quality -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span id="i18n-shadows">Shadow Quality</span>
+          <span class="ctrl-sublabel" id="label-shadow">High</span>
+        </div>
+        <div class="seg-row" id="seg-shadow">
+          <button class="seg-btn ctrl-item" data-ctrl-type="seg-shadow" data-shadow="off">Off</button>
+          <button class="seg-btn ctrl-item" data-ctrl-type="seg-shadow" data-shadow="low">Low</button>
+          <button class="seg-btn ctrl-item" data-ctrl-type="seg-shadow" data-shadow="med">Med</button>
+          <button class="seg-btn active ctrl-item" data-ctrl-type="seg-shadow" data-shadow="high">High</button>
+        </div>
+      </div>
+
+      <!-- Anti-Aliasing Toggle -->
+      <div class="toggle-row">
+        <span class="toggle-label" id="i18n-antialias">Hardware Anti-Aliasing</span>
+        <div id="toggle-aa" class="toggle-switch active ctrl-item" data-ctrl-type="toggle" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Post-Processing Glow / Bloom -->
+      <div class="toggle-row">
+        <span class="toggle-label" id="i18n-post">Post-Processing (Bloom)</span>
+        <div id="toggle-post" class="toggle-switch active ctrl-item" data-ctrl-type="toggle" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Stress Clones Army -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span id="i18n-clones">Stress Clones Army</span>
+          <span class="ctrl-sublabel" id="label-clones">1x (Solo)</span>
+        </div>
+        <input type="range" id="slider-clones" class="range-input ctrl-item" data-ctrl-type="range" min="1" max="25" step="1" value="1" tabindex="0">
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; direction:ltr;">
+          <span>1x</span>
+          <span>5x</span>
+          <span>10x</span>
+          <span>18x</span>
+          <span>25x</span>
+        </div>
+      </div>
+
+      <!-- Camera Auto Orbit -->
+      <div class="toggle-row">
+        <span class="toggle-label" id="i18n-orbit">Auto-Orbit Camera</span>
+        <div id="toggle-orbit" class="toggle-switch active ctrl-item" data-ctrl-type="toggle" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Orbit Speed -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span id="i18n-speed">Orbit Speed</span>
+          <span class="ctrl-sublabel" id="label-speed">1.0x</span>
+        </div>
+        <input type="range" id="slider-speed" class="range-input ctrl-item" data-ctrl-type="range" min="0.2" max="3.0" step="0.2" value="1.0" tabindex="0">
+      </div>
+
+      <!-- Reset Camera Button -->
+      <button id="btn-reset-cam" class="btn-secondary ctrl-item" data-ctrl-type="action" tabindex="0">
+        <span id="i18n-reset-cam">↺ Reset Camera View</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Cinema Zen Toggle Button -->
+  <button id="toggle-hud-btn" class="ctrl-item" data-ctrl-type="action" tabindex="0">
+    <span id="i18n-hud-btn">👁 Hide HUD</span>
+  </button>
+
+  <!-- TV Remote / Gamepad Hints -->
+  <div id="nav-hint-bar">
+    <span><span class="hint-tag">D-Pad / ▲▼</span> Navigate</span>
+    <span><span class="hint-tag">◄ ►</span> Adjust</span>
+    <span><span class="hint-tag">OK / A</span> Select</span>
+    <span><span class="hint-tag">LB / RB</span> Subdiv</span>
+    <span><span class="hint-tag">R-Stick / LT RT</span> Camera</span>
+    <span><span class="hint-tag">X</span> Benchmark</span>
+    <span><span class="hint-tag">Y</span> Wireframe</span>
+    <span><span class="hint-tag">B / Start</span> HUD</span>
+  </div>
+
+  <!-- Benchmark Progress & Result Modal -->
+  <div id="benchmark-overlay">
+    <!-- Running State -->
+    <div id="bm-running-box" class="bm-card">
+      <h2 style="margin:0; font-size:20px; color:#f8fafc;" id="i18n-bm-title">GPU Stress Benchmark</h2>
+      <p style="margin:0; font-size:12px; color:#94a3b8;" id="i18n-bm-desc">Testing geometry subdivision, fillrate, and shadow cascades...</p>
+      <div style="font-size:28px; font-weight:800; color:#38bdf8; font-family:monospace; direction:ltr;" id="bm-timer-text">15.0s</div>
+      <div class="bm-progress-bar-bg">
+        <div class="bm-progress-fill" id="bm-progress-fill"></div>
+      </div>
+      <div style="font-size:11px; color:#94a3b8; direction:ltr;" id="bm-current-fps">Sampling FPS...</div>
+    </div>
+
+    <!-- Complete Result State -->
+    <div id="bm-result-box" class="bm-card" style="display:none;">
+      <h2 style="margin:0; font-size:17px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;" id="i18n-bm-result">Benchmark Result</h2>
+      <div class="bm-score-display" id="bm-final-score">8,450</div>
+      <div class="bm-grade-badge grade-s" id="bm-grade-badge">S+ ULTRA PERFORMANCE</div>
+      
+      <div class="bm-stat-grid">
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-avg">60.0</div>
+          <div class="bm-stat-desc">Avg FPS</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-low">56.2</div>
+          <div class="bm-stat-desc">1% Low FPS</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-tris">36.8k</div>
+          <div class="bm-stat-desc">Triangles</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-res">1080p</div>
+          <div class="bm-stat-desc">Resolution</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-shadow">High</div>
+          <div class="bm-stat-desc">Shadows</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-time">16.6ms</div>
+          <div class="bm-stat-desc">Frame Time</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <button id="btn-close-bm" class="btn-benchmark ctrl-item" data-ctrl-type="action" style="flex:1;"><span id="i18n-bm-close">Close &amp; Inspect</span></button>
+        <button id="btn-rerun-bm" class="btn-secondary ctrl-item" data-ctrl-type="action" style="flex:1;"><span id="i18n-bm-rerun">Rerun Test</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. My PC SDK (MUST be loaded first before own code) -->
+  <script src="https://imad-os.github.io/g/sdk/mypc-sdk.js"></script>
+  <!-- 2. External Libraries: Three.js r128 & Stats.js r17 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js"></script>
+  <!-- 3. Compiled Application Bundle (with version matching mypc-app.json) -->
+  <script src="assets/app.js?v={{VERSION}}"></script>
+</body>
+</html>
