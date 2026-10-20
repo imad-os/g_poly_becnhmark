@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WebGL 3D Benchmark</title>
+  <meta name="description" content="Interactive 3D WebGL stress test and GPU benchmark featuring procedural humanoid subdivision and real-time metrics">
+  <meta property="og:title" content="WebGL 3D Benchmark">
+  <meta property="og:description" content="Interactive 3D WebGL stress test and GPU benchmark featuring procedural humanoid subdivision and real-time metrics">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #080c14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #f1f5f9;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 1;
+      outline: none;
+    }
+
+    /* Stats.js container styling */
+    #stats-container {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 20;
+      pointer-events: auto;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    /* Top telemetry metrics strip */
+    #telemetry-bar {
+      position: absolute;
+      top: 12px;
+      left: 110px;
+      z-index: 20;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+    .metric-badge {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+    .metric-label {
+      color: #94a3b8;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric-value {
+      color: #38bdf8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* Right-side Control Panel */
+    #control-panel {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: 350px;
+      max-width: calc(100vw - 24px);
+      background: rgba(13, 20, 36, 0.90);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease;
+    }
+    #control-panel.hidden {
+      transform: translateX(calc(100% + 24px));
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    /* Panel Header */
+    .panel-header {
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-title-box h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-tag {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      text-transform: uppercase;
+    }
+    .panel-subtitle {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Scrollable Panel Body */
+    .panel-body {
+      padding: 14px 18px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel-body::-webkit-scrollbar {
+      width: 5px;
+    }
+    .panel-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+
+    /* Control Groups */
+    .ctrl-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .ctrl-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    .ctrl-sublabel {
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+      font-family: ui-monospace, monospace;
+    }
+
+    /* Sliders */
+    .range-input {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #1e293b;
+      outline: none;
+      cursor: pointer;
+    }
+    .range-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      border: 2px solid #ffffff;
+      transition: transform 0.1s ease;
+    }
+    .range-input::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* Segmented Button Row */
+    .seg-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .seg-btn {
+      padding: 7px 4px;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .seg-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.4);
+    }
+
+    /* Toggle Switches */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+    }
+    .toggle-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #1e293b;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .toggle-switch.active {
+      background: #0284c7;
+      border-color: #38bdf8;
+    }
+    .toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      background: #ffffff;
+      border-radius: 50%;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    .toggle-switch.active .toggle-knob {
+      transform: translateX(20px);
+    }
+
+    /* Material Color Swatches */
+    .swatch-row {
+      display: flex;
+      gap: 8px;
+    }
+    .swatch-btn {
+      flex: 1;
+      height: 26px;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .swatch-btn.active {
+      border-color: #ffffff;
+      transform: scale(1.08);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+    }
+
+    /* Benchmark Run Button */
+    .btn-benchmark {
+      width: 100%;
+      padding: 11px 16px;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #7c3aed 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.15s, filter 0.15s;
+    }
+    .btn-benchmark:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    /* Secondary Action Buttons */
+    .btn-secondary {
+      padding: 7px 12px;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover {
+      background: rgba(51, 65, 85, 0.8);
+      color: #f8fafc;
+    }
+
+    /* TV & Gamepad Focus Outline (3m visibility rule) */
+    .ctrl-item:focus,
+    .ctrl-item:focus-visible {
+      outline: 3px solid #38bdf8 !important;
+      outline-offset: 2px !important;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.6) !important;
+    }
+
+    /* Floating Cinema Toggle Button */
+    #toggle-hud-btn {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      z-index: 25;
+      padding: 7px 13px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: all 0.2s;
+    }
+    #toggle-hud-btn:hover {
+      color: #f8fafc;
+      border-color: #38bdf8;
+    }
+
+    /* TV / Controller Navigation Hint Dock at bottom */
+    #nav-hint-bar {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 5px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .hint-tag {
+      display: inline-block;
+      padding: 1px 4px;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      color: #38bdf8;
+      font-weight: 700;
+      font-size: 10px;
+      margin-right: 3px;
+    }
+
+    /* Benchmark Progress Overlay */
+    #benchmark-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background: rgba(8, 12, 20, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    #benchmark-overlay.active {
+      display: flex;
+    }
+    .bm-card {
+      width: 440px;
+      max-width: 90vw;
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-align: center;
+    }
+    .bm-progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: #1e293b;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .bm-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0284c7, #38bdf8);
+      border-radius: 4px;
+      transition: width 0.1s linear;
+    }
+    .bm-score-display {
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #38bdf8;
+      font-family: ui-monospace, monospace;
+    }
+    .bm-grade-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-weight: 800;
+      font-size: 13px;
+      margin: 0 auto;
+    }
+    .grade-s { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .grade-a { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid #22c55e; }
+    .grade-b { background: rgba(234, 179, 8, 0.2); color: #eab308; border: 1px solid #eab308; }
+    .grade-c { background: rgba(249, 115, 22, 0.2); color: #f97316; border: 1px solid #f97316; }
+
+    .bm-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .bm-stat-item {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 9px;
+    }
+    .bm-stat-num {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f8fafc;
+      font-family: ui-monospace, monospace;
+    }
+    .bm-stat-desc {
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Stats.js container -->
+  <div id="stats-container"></div>
+
+  <!-- Realtime Telemetry HUD -->
+  <div id="telemetry-bar">
+    <div class="metric-badge">
+      <span class="metric-label">Resolution</span>
+      <span class="metric-value" id="hud-res">1920×1080</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label">Triangles</span>
+      <span class="metric-value" id="hud-tris">144</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label">Vertices</span>
+      <span class="metric-value" id="hud-verts">288</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label">Draw Calls</span>
+      <span class="metric-value" id="hud-draws">4</span>
+    </div>
+    <div class="metric-badge">
+      <span class="metric-label">Subdiv Level</span>
+      <span class="metric-value" id="hud-level">0</span>
+    </div>
+  </div>
+
+  <!-- Sleek Dark Control Panel -->
+  <div id="control-panel">
+    <div class="panel-header">
+      <div class="header-title-box">
+        <h1>WebGL Benchmark <span class="status-tag">v1.0</span></h1>
+        <div class="panel-subtitle">Loop Subdivision & Stress Engine</div>
+      </div>
+      <button id="btn-close-hud" class="btn-secondary ctrl-item" title="Hide HUD (H / Cancel)" style="padding: 4px 8px;">✕</button>
+    </div>
+
+    <div class="panel-body">
+      <!-- Benchmark CTA -->
+      <button id="btn-start-benchmark" class="btn-benchmark ctrl-item" tabindex="0">
+        <span>⚡ RUN BENCHMARK (15s)</span>
+      </button>
+
+      <!-- Section: Subdivision & Polygon Density -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span>Character Smoothing</span>
+          <span class="ctrl-sublabel" id="label-subdiv-level">Level 0 (Low-Poly)</span>
+        </div>
+        <input type="range" id="slider-subdiv" class="range-input ctrl-item" min="0" max="4" step="1" value="0" tabindex="0">
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b;">
+          <span>L0: Blocky</span>
+          <span>L1</span>
+          <span>L2: Smooth</span>
+          <span>L3</span>
+          <span>L4: Ultra</span>
+        </div>
+      </div>
+
+      <!-- Wireframe & Articulation Toggles -->
+      <div class="toggle-row">
+        <span class="toggle-label">Wireframe Mesh</span>
+        <div id="toggle-wireframe" class="toggle-switch ctrl-item" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Character Material Finish -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span>Material Surface</span>
+          <span class="ctrl-sublabel" id="label-mat">Cyber Titanium</span>
+        </div>
+        <div class="swatch-row">
+          <button class="swatch-btn active ctrl-item" data-mat="cobalt" style="background:#0284c7;" title="Cyber Cobalt"></button>
+          <button class="swatch-btn ctrl-item" data-mat="stealth" style="background:#334155;" title="Dark Stealth"></button>
+          <button class="swatch-btn ctrl-item" data-mat="gold" style="background:#f59e0b;" title="Titanium Gold"></button>
+          <button class="swatch-btn ctrl-item" data-mat="emerald" style="background:#10b981;" title="Bio Emerald"></button>
+          <button class="swatch-btn ctrl-item" data-mat="clay" style="background:#e2e8f0;" title="Matte Clay"></button>
+        </div>
+      </div>
+
+      <!-- Section: Display Resolution -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span>Target Resolution</span>
+          <span class="ctrl-sublabel" id="label-res">Auto</span>
+        </div>
+        <div class="seg-row" id="seg-res">
+          <button class="seg-btn ctrl-item" data-res="480p">480p</button>
+          <button class="seg-btn ctrl-item" data-res="720p">720p</button>
+          <button class="seg-btn ctrl-item" data-res="1080p">1080p</button>
+          <button class="seg-btn active ctrl-item" data-res="auto">Auto</button>
+        </div>
+      </div>
+
+      <!-- Section: Shadow Quality -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span>Shadow Quality</span>
+          <span class="ctrl-sublabel" id="label-shadow">High</span>
+        </div>
+        <div class="seg-row" id="seg-shadow">
+          <button class="seg-btn ctrl-item" data-shadow="off">Off</button>
+          <button class="seg-btn ctrl-item" data-shadow="low">Low</button>
+          <button class="seg-btn ctrl-item" data-shadow="med">Med</button>
+          <button class="seg-btn active ctrl-item" data-shadow="high">High</button>
+        </div>
+      </div>
+
+      <!-- Anti-Aliasing Toggle -->
+      <div class="toggle-row">
+        <span class="toggle-label">Hardware Anti-Aliasing</span>
+        <div id="toggle-aa" class="toggle-switch active ctrl-item" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Post-Processing Glow / Bloom -->
+      <div class="toggle-row">
+        <span class="toggle-label">Post-Processing (Bloom / Glow)</span>
+        <div id="toggle-post" class="toggle-switch active ctrl-item" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Stress Clones Army -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span>Stress Clones Army</span>
+          <span class="ctrl-sublabel" id="label-clones">1x (Solo)</span>
+        </div>
+        <input type="range" id="slider-clones" class="range-input ctrl-item" min="1" max="25" step="1" value="1" tabindex="0">
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b;">
+          <span>1x</span>
+          <span>5x</span>
+          <span>10x</span>
+          <span>18x</span>
+          <span>25x Clones</span>
+        </div>
+      </div>
+
+      <!-- Camera Auto Orbit -->
+      <div class="toggle-row">
+        <span class="toggle-label">Auto-Orbit Camera</span>
+        <div id="toggle-orbit" class="toggle-switch active ctrl-item" tabindex="0">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <!-- Orbit Speed -->
+      <div class="ctrl-group">
+        <div class="ctrl-label-row">
+          <span>Orbit Speed</span>
+          <span class="ctrl-sublabel" id="label-speed">1.0x</span>
+        </div>
+        <input type="range" id="slider-speed" class="range-input ctrl-item" min="0.2" max="3.0" step="0.2" value="1.0" tabindex="0">
+      </div>
+
+      <!-- Reset Camera Button -->
+      <button id="btn-reset-cam" class="btn-secondary ctrl-item" tabindex="0">
+        <span>↺ Reset Camera View</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Cinema Zen Toggle Button -->
+  <button id="toggle-hud-btn" class="ctrl-item" tabindex="0">
+    <span>👁 HUD Controls (H)</span>
+  </button>
+
+  <!-- TV Remote / Gamepad Hints -->
+  <div id="nav-hint-bar">
+    <span><span class="hint-tag">D-Pad</span> Navigate</span>
+    <span><span class="hint-tag">◄ ►</span> Adjust</span>
+    <span><span class="hint-tag">OK / A</span> Select</span>
+    <span><span class="hint-tag">H / B</span> Toggle HUD</span>
+    <span><span class="hint-tag">X</span> Benchmark</span>
+  </div>
+
+  <!-- Benchmark Progress & Result Modal -->
+  <div id="benchmark-overlay">
+    <!-- Running State -->
+    <div id="bm-running-box" class="bm-card">
+      <h2 style="margin:0; font-size:20px; color:#f8fafc;">GPU Stress Benchmark</h2>
+      <p style="margin:0; font-size:12px; color:#94a3b8;">Testing geometry subdivision, fillrate, and shadow cascades...</p>
+      <div style="font-size:28px; font-weight:800; color:#38bdf8; font-family:monospace;" id="bm-timer-text">15.0s</div>
+      <div class="bm-progress-bar-bg">
+        <div class="bm-progress-fill" id="bm-progress-fill"></div>
+      </div>
+      <div style="font-size:11px; color:#64748b;" id="bm-current-fps">Sampling FPS...</div>
+    </div>
+
+    <!-- Complete Result State -->
+    <div id="bm-result-box" class="bm-card" style="display:none;">
+      <h2 style="margin:0; font-size:17px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;">Benchmark Result</h2>
+      <div class="bm-score-display" id="bm-final-score">8,450</div>
+      <div class="bm-grade-badge grade-s" id="bm-grade-badge">S+ ULTRA PERFORMANCE</div>
+      
+      <div class="bm-stat-grid">
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-avg">60.0</div>
+          <div class="bm-stat-desc">Avg FPS</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-low">56.2</div>
+          <div class="bm-stat-desc">1% Low FPS</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-tris">36.8k</div>
+          <div class="bm-stat-desc">Triangles</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-res">1080p</div>
+          <div class="bm-stat-desc">Resolution</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-shadow">High</div>
+          <div class="bm-stat-desc">Shadows</div>
+        </div>
+        <div class="bm-stat-item">
+          <div class="bm-stat-num" id="bm-stat-time">16.6ms</div>
+          <div class="bm-stat-desc">Frame Time</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <button id="btn-close-bm" class="btn-benchmark ctrl-item" style="flex:1;">Close & Inspect</button>
+        <button id="btn-rerun-bm" class="btn-secondary ctrl-item" style="flex:1;">Rerun Test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- External Libraries: Three.js r128, Stats.js r17, MyPC SDK -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js"></script>
+  <script src="https://imad-os.github.io/g/sdk/mypc-sdk.js"></script>
+
+  <!-- Embedded Loop Subdivision Modifier -->
+  <script>
+/**
+ * @description Loop Subdivision Surface
+ * @about       Smooth subdivision surface modifier for use with three.js BufferGeometry.
+ * @author      Stephens Nunnally <@stevinz>
+ * @license     MIT - Copyright (c) 2022 Stephens Nunnally
+ * @source      https://github.com/stevinz/three-subdivide
+ */const POSITION_DECIMALS=2,_average=new THREE.Vector3,_center=new THREE.Vector3,_midpoint=new THREE.Vector3,_normal=new THREE.Vector3,_temp=new THREE.Vector3,_vector0=new THREE.Vector3,_vector1=new THREE.Vector3,_vector2=new THREE.Vector3,_vec0to1=new THREE.Vector3,_vec1to2=new THREE.Vector3,_vec2to0=new THREE.Vector3,_position=[new THREE.Vector3,new THREE.Vector3,new THREE.Vector3],_vertex=[new THREE.Vector3,new THREE.Vector3,new THREE.Vector3],_triangle=new THREE.Triangle;class LoopSubdivision{static modify(n,e=1,i={}){if(arguments.length>3&&console.warn("LoopSubdivision.modify() now uses a parameter object. See readme for more info!"),typeof i!="object"&&(i={}),i.split===void 0&&(i.split=!0),i.uvSmooth===void 0&&(i.uvSmooth=!1),i.preserveEdges===void 0&&(i.preserveEdges=!1),i.flatOnly===void 0&&(i.flatOnly=!1),i.maxTriangles===void 0&&(i.maxTriangles=1/0),i.weight===void 0&&(i.weight=1),(isNaN(i.weight)||!isFinite(i.weight))&&(i.weight=1),i.weight=Math.max(0,Math.min(1,i.weight)),!verifyGeometry(n))return n;let d=n.clone();if(i.split){const g=LoopSubdivision.edgeSplit(d);d.dispose(),d=g}for(let g=0;g<e;g++)if(d.attributes.position.count/3<i.maxTriangles){let b;i.flatOnly?b=LoopSubdivision.flat(d,i):b=LoopSubdivision.smooth(d,i),d.groups.forEach(a=>{b.addGroup(a.start*4,a.count*4,a.materialIndex)}),d.dispose(),d=b}return d}static edgeSplit(n){if(!verifyGeometry(n))return n;const e=n.index!==null?n.toNonIndexed():n.clone(),i=new THREE.BufferGeometry,d=gatherAttributes(e),g=e.attributes.position.count,m=e.getAttribute("position"),b=e.getAttribute("normal"),a={},E=[],y={},S=[];for(let l=0;l<g;l+=3){_vector0.fromBufferAttribute(m,l+0),_vector1.fromBufferAttribute(m,l+1),_vector2.fromBufferAttribute(m,l+2),_normal.fromBufferAttribute(b,l);const w=hashFromVector(_vector0),p=hashFromVector(_vector1),T=hashFromVector(_vector2),V=_triangle.set(_vector0,_vector1,_vector2).getArea();if(S.push(!fuzzy(V,0)),!S[l/3]){E.push([]);continue}calcNormal(_normal,_vector0,_vector1,_vector2);const t=hashFromVector(_normal),s=[`${w}_${p}_${t}`,`${p}_${w}_${t}`,`${p}_${T}_${t}`,`${T}_${p}_${t}`,`${T}_${w}_${t}`,`${w}_${T}_${t}`],u=l/3;for(let c=0;c<s.length;c++)a[s[c]]||(a[s[c]]=[]),a[s[c]].push(u),y[s[c]]||((c===0||c===1)&&(y[s[c]]=_vector0.distanceTo(_vector1)),(c===2||c===3)&&(y[s[c]]=_vector1.distanceTo(_vector2)),(c===4||c===5)&&(y[s[c]]=_vector2.distanceTo(_vector0)));E.push([s[0],s[2],s[4]])}d.forEach(l=>{const w=e.getAttribute(l);if(!w)return;const p=L(w,l);i.setAttribute(l,new THREE.BufferAttribute(p,w.itemSize))});const R=e.morphAttributes;for(const l in R){const w=[],p=R[l];for(let T=0,V=p.length;T<V;T++){if(p[T].count!==g)continue;const t=L(p[T],l,!0);w.push(new THREE.BufferAttribute(t,p[T].itemSize))}i.morphAttributes[l]=w}return i.morphTargetsRelative=e.morphTargetsRelative,e.dispose(),i;function L(l,w,p=!1){const V=g*l.itemSize*4,t=new l.array.constructor(V),s=w==="position"&&!p&&e.groups.length>0;let u,c,r=0,H=0,o=l.itemSize;for(let A=0;A<g;A+=3){if(!S[A/3]){H+=3;continue}_vector0.fromBufferAttribute(l,A+0),_vector1.fromBufferAttribute(l,A+1),_vector2.fromBufferAttribute(l,A+2);const B=A/3,v=E[B][0],_=E[B][1],I=E[B][2],$=a[v].length,C=a[_].length,x=a[I].length,G=$+C+x-3,O=r*3/o/3;if(G===0)setTriangle(t,r,o,_vector0,_vector1,_vector2),r+=o*3;else{const M=y[v],N=y[_],j=y[I];(M>N||C<=1)&&(M>j||x<=1)&&$>1?(_center.copy(_vector0).add(_vector1).divideScalar(2),x>1?(_midpoint.copy(_vector2).add(_vector0).divideScalar(2),setTriangle(t,r,o,_vector0,_center,_midpoint),r+=o*3,setTriangle(t,r,o,_center,_vector2,_midpoint),r+=o*3):(setTriangle(t,r,o,_vector0,_center,_vector2),r+=o*3),C>1?(_midpoint.copy(_vector1).add(_vector2).divideScalar(2),setTriangle(t,r,o,_center,_vector1,_midpoint),r+=o*3,setTriangle(t,r,o,_midpoint,_vector2,_center),r+=o*3):(setTriangle(t,r,o,_vector1,_vector2,_center),r+=o*3)):(N>j||x<=1)&&C>1?(_center.copy(_vector1).add(_vector2).divideScalar(2),$>1?(_midpoint.copy(_vector0).add(_vector1).divideScalar(2),setTriangle(t,r,o,_center,_midpoint,_vector1),r+=o*3,setTriangle(t,r,o,_midpoint,_center,_vector0),r+=o*3):(setTriangle(t,r,o,_vector1,_center,_vector0),r+=o*3),x>1?(_midpoint.copy(_vector2).add(_vector0).divideScalar(2),setTriangle(t,r,o,_center,_vector2,_midpoint),r+=o*3,setTriangle(t,r,o,_midpoint,_vector0,_center),r+=o*3):(setTriangle(t,r,o,_vector2,_vector0,_center),r+=o*3)):x>1?(_center.copy(_vector2).add(_vector0).divideScalar(2),C>1?(_midpoint.copy(_vector1).add(_vector2).divideScalar(2),setTriangle(t,r,o,_vector2,_center,_midpoint),r+=o*3,setTriangle(t,r,o,_center,_vector1,_midpoint),r+=o*3):(setTriangle(t,r,o,_vector2,_center,_vector1),r+=o*3),$>1?(_midpoint.copy(_vector0).add(_vector1).divideScalar(2),setTriangle(t,r,o,_vector0,_midpoint,_center),r+=o*3,setTriangle(t,r,o,_midpoint,_vector1,_center),r+=o*3):(setTriangle(t,r,o,_vector0,_vector1,_center),r+=o*3)):(setTriangle(t,r,o,_vector0,_vector1,_vector2),r+=o*3)}s&&e.groups.forEach(M=>{M.start===A-H&&(u!==void 0&&c!==void 0&&i.addGroup(u,O-u,c),u=O,c=M.materialIndex)}),H=0}const h=r*3/o,z=new l.array.constructor(h);for(let A=0;A<h;A++)z[A]=t[A];return s&&u!==void 0&&c!==void 0&&i.addGroup(u,r*3/o/3-u,c),z}}static flat(n,e={}){if(!verifyGeometry(n))return n;const i=n.index!==null?n.toNonIndexed():n.clone(),d=new THREE.BufferGeometry,g=gatherAttributes(i),m=i.attributes.position.count;g.forEach(a=>{const E=i.getAttribute(a);E&&d.setAttribute(a,LoopSubdivision.flatAttribute(E,m,e))});const b=i.morphAttributes;for(const a in b){const E=[],y=b[a];for(let S=0,R=y.length;S<R;S++)y[S].count===m&&E.push(LoopSubdivision.flatAttribute(y[S],m,e));d.morphAttributes[a]=E}return d.morphTargetsRelative=i.morphTargetsRelative,i.dispose(),d}static flatAttribute(n,e,i={}){const g=e*n.itemSize*4,m=new n.array.constructor(g);let b=0,a=n.itemSize;for(let E=0;E<e;E+=3)_vector0.fromBufferAttribute(n,E+0),_vector1.fromBufferAttribute(n,E+1),_vector2.fromBufferAttribute(n,E+2),_vec0to1.copy(_vector0).add(_vector1).divideScalar(2),_vec1to2.copy(_vector1).add(_vector2).divideScalar(2),_vec2to0.copy(_vector2).add(_vector0).divideScalar(2),setTriangle(m,b,a,_vector0,_vec0to1,_vec2to0),b+=a*3,setTriangle(m,b,a,_vector1,_vec1to2,_vec0to1),b+=a*3,setTriangle(m,b,a,_vector2,_vec2to0,_vec1to2),b+=a*3,setTriangle(m,b,a,_vec0to1,_vec1to2,_vec2to0),b+=a*3;return new THREE.BufferAttribute(m,n.itemSize)}static smooth(n,e={}){if(typeof e!="object"&&(e={}),e.uvSmooth===void 0&&(e.uvSmooth=!1),e.preserveEdges===void 0&&(e.preserveEdges=!1),!verifyGeometry(n))return n;const i=n.index!==null?n.toNonIndexed():n.clone(),d=LoopSubdivision.flat(i,e),g=new THREE.BufferGeometry,m=gatherAttributes(i),b=i.attributes.position.count,a=i.getAttribute("position"),E=d.getAttribute("position"),y={},S={},R={},L={};function l(t,s,u){S[t]||(S[t]={}),S[t][s]||(S[t][s]=[]),S[t][s].push(u)}function w(t,s){R[t]||(R[t]=[]),R[t].push(s)}function p(t,s){L[t]||(L[t]=new Set),L[t].add(s)}for(let t=0;t<b;t+=3){const s=hashFromVector(_vertex[0].fromBufferAttribute(a,t+0)),u=hashFromVector(_vertex[1].fromBufferAttribute(a,t+1)),c=hashFromVector(_vertex[2].fromBufferAttribute(a,t+2));l(s,u,t+1),l(s,c,t+2),l(u,s,t+0),l(u,c,t+2),l(c,s,t+0),l(c,u,t+1),_vec0to1.copy(_vertex[0]).add(_vertex[1]).divideScalar(2),_vec1to2.copy(_vertex[1]).add(_vertex[2]).divideScalar(2),_vec2to0.copy(_vertex[2]).add(_vertex[0]).divideScalar(2);const r=hashFromVector(_vec0to1),H=hashFromVector(_vec1to2),o=hashFromVector(_vec2to0);w(r,t+2),w(H,t+0),w(o,t+1),p(s,r),p(s,o),p(u,r),p(u,H),p(c,H),p(c,o)}for(let t=0;t<d.attributes.position.count;t++){const s=hashFromVector(_temp.fromBufferAttribute(E,t));y[s]||(y[s]=[]),y[s].push(t)}m.forEach(t=>{const s=i.getAttribute(t),u=d.getAttribute(t);if(s===void 0||u===void 0)return;const c=V(t,s,u);g.setAttribute(t,new THREE.BufferAttribute(c,u.itemSize))});const T=i.morphAttributes;for(const t in T){const s=[],u=T[t];for(let c=0,r=u.length;c<r;c++){if(u[c].count!==b)continue;const H=u[c],o=LoopSubdivision.flatAttribute(u[c],u[c].count,e),h=V(t,H,o);s.push(new THREE.BufferAttribute(h,o.itemSize))}g.morphAttributes[t]=s}return g.morphTargetsRelative=i.morphTargetsRelative,d.dispose(),i.dispose(),g;function V(t,s,u){const c=d.attributes.position.count*u.itemSize,r=new s.array.constructor(c);let H=0;for(let o=0;o<d.attributes.position.count;o+=3){for(let h=0;h<3;h++)if(t==="uv"&&!e.uvSmooth)_vertex[h].fromBufferAttribute(u,o+h);else if(t==="normal"){_position[h].fromBufferAttribute(E,o+h);const z=hashFromVector(_position[h]),A=y[z],B=Object.keys(A).length,v=.75/B,_=1-v*B;_vertex[h].fromBufferAttribute(u,o+h),_vertex[h].multiplyScalar(_),A.forEach(I=>{_average.fromBufferAttribute(u,I),_average.multiplyScalar(v),_vertex[h].add(_average)})}else{_vertex[h].fromBufferAttribute(u,o+h),_position[h].fromBufferAttribute(E,o+h);const z=hashFromVector(_position[h]),A=S[z],B=R[z];if(A){if(e.preserveEdges){const x=L[z];let G=!0;for(const O of x)R[O].length%2!==0&&(G=!1);if(!G)continue}const v=Object.keys(A).length,_=1/v*(5/8-Math.pow(3/8+1/4*Math.cos(2*Math.PI/v),2)),I=1/v/v,$=lerp(I,_,e.weight),C=1-$*v;_vertex[h].multiplyScalar(C);for(let x in A){const G=A[x];_average.set(0,0,0);for(let O=0;O<G.length;O++)_average.add(_temp.fromBufferAttribute(s,G[O]));_average.divideScalar(G.length),_average.multiplyScalar($),_vertex[h].add(_average)}}else if(B&&B.length===2){const v=B.length,_=.125,I=1-_*v;_vertex[h].multiplyScalar(I),B.forEach($=>{_average.fromBufferAttribute(s,$),_average.multiplyScalar(_),_vertex[h].add(_average)})}}setTriangle(r,H,u.itemSize,_vertex[0],_vertex[1],_vertex[2]),H+=u.itemSize*3}return r}}}const _positionShift=Math.pow(10,2);function fuzzy(f,n,e=1e-5){return f<n+e&&f>n-e}function hashFromNumber(f,n=_positionShift){let e=round(f*n);return e==0&&(e=0),`${e}`}function hashFromVector(f,n=_positionShift){return`${hashFromNumber(f.x,n)},${hashFromNumber(f.y,n)},${hashFromNumber(f.z,n)}`}function lerp(f,n,e){return(1-e)*f+e*n}function round(f){return f+(f>0?.5:-.5)<<0}function calcNormal(f,n,e,i){_temp.subVectors(n,e),f.subVectors(e,i),f.cross(_temp).normalize()}function gatherAttributes(f){const n=["position","normal","uv"],e=Object.keys(f.attributes);return Array.from(new Set(n.concat(e)))}function setTriangle(f,n,e,i,d,g){e>=1&&(f[n+0+e*0]=i.x,f[n+0+e*1]=d.x,f[n+0+e*2]=g.x),e>=2&&(f[n+1+e*0]=i.y,f[n+1+e*1]=d.y,f[n+1+e*2]=g.y),e>=3&&(f[n+2+e*0]=i.z,f[n+2+e*1]=d.z,f[n+2+e*2]=g.z),e>=4&&(f[n+3+e*0]=i.w,f[n+3+e*1]=d.w,f[n+3+e*2]=g.w)}function verifyGeometry(f){return f===void 0?(console.warn("LoopSubdivision: Geometry provided is undefined"),!1):f.isBufferGeometry?f.attributes.position===void 0?(console.warn("LoopSubdivision: Geometry provided missing required 'position' attribute"),!1):(f.attributes.normal===void 0&&f.computeVertexNormals(),!0):(console.warn("LoopSubdivision: Geometry provided is not 'BufferGeometry' type"),!1)}window.LoopSubdivision=LoopSubdivision;
+
+  </script>
+
+  <!-- Main Application Script -->
+  <script>
+  (function() {
+    'use strict';
+
+    // Application State
+    var state = {
+      subdivLevel: 0,
+      targetRes: 'auto',
+      shadowQuality: 'high',
+      antialias: true,
+      postProcessing: true,
+      wireframe: false,
+      materialPreset: 'cobalt',
+      clonesCount: 1,
+      autoOrbit: true,
+      orbitSpeed: 1.0,
+      hudVisible: true
+    };
+
+    // Global Three.js References
+    var scene, camera, renderer, renderTarget, postScene, postCamera, postMaterial;
+    var dirLight, hemiLight, ambientLight, rimLight;
+    var characterGroup, baseHumanoidGeom, currentCharacterMesh, wireframeMesh;
+    var pedestalMesh, contactShadowMesh;
+    var stats, rafId = 0, lastTime = 0;
+    var clonesGroup = null;
+
+    // Camera Orbit State
+    var camDistance = 7.8;
+    var camAngle = 0.6;
+    var camElevation = 2.4;
+    var isDragging = false;
+    var previousMouseX = 0, previousMouseY = 0;
+
+    // Subdivided Geometry Cache
+    var geometryCache = {};
+
+    // Benchmark Metrics Tracker
+    var benchmark = {
+      active: false,
+      duration: 15.0,
+      elapsed: 0,
+      frameCount: 0,
+      frameTimes: [],
+      fpsSamples: []
+    };
+
+    // Material Definitions
+    var materials = {
+      cobalt:  new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.50, roughness: 0.32 }),
+      stealth: new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.65, roughness: 0.28 }),
+      gold:    new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.75, roughness: 0.25 }),
+      emerald: new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.40, roughness: 0.35 }),
+      clay:    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.05, roughness: 0.75 })
+    };
+    var wireframeMat = new THREE.MeshBasicMaterial({ color: 0x090d16, wireframe: true, transparent: true, opacity: 0.3 });
+
+    // Initialize Stats.js
+    function initStats() {
+      if (window.Stats) {
+        stats = new Stats();
+        stats.showPanel(0); // 0: fps, 1: ms
+        var container = document.getElementById('stats-container');
+        if (container) {
+          container.appendChild(stats.dom);
+          stats.dom.style.position = 'relative';
+        }
+      }
+    }
+
+    // Procedural Minecraft-style Base Humanoid Generator
+    function createBaseHumanoidGeometry() {
+      var parts = [];
+
+      function createPart(w, h, d, x, y, z) {
+        var geom = new THREE.BoxGeometry(w, h, d);
+        geom.translate(x, y + 0.33, z);
+        parts.push(geom);
+      }
+
+      // Head: 0.8 x 0.8 x 0.8
+      createPart(0.8, 0.8, 0.8, 0, 2.7, 0);
+
+      // Cyber Visor / Face accent
+      createPart(0.72, 0.16, 0.1, 0, 2.73, 0.41);
+
+      // Neck / Collar
+      createPart(0.36, 0.2, 0.36, 0, 2.25, 0);
+
+      // Chest / Upper Torso
+      createPart(0.92, 0.75, 0.52, 0, 1.85, 0);
+
+      // Pelvis / Lower Torso
+      createPart(0.76, 0.55, 0.46, 0, 1.25, 0);
+
+      // Arms (Upper & Lower)
+      createPart(0.36, 0.62, 0.36, -0.64, 1.85, 0);
+      createPart(0.32, 0.62, 0.32, -0.64, 1.23, 0);
+      createPart(0.36, 0.62, 0.36,  0.64, 1.85, 0);
+      createPart(0.32, 0.62, 0.32,  0.64, 1.23, 0);
+
+      // Legs (Thigh & Calf/Boot)
+      createPart(0.36, 0.66, 0.36, -0.23, 0.65, 0);
+      createPart(0.34, 0.66, 0.40, -0.23, 0.0, 0.02);
+      createPart(0.36, 0.66, 0.36,  0.23, 0.65, 0);
+      createPart(0.34, 0.66, 0.40,  0.23, 0.0, 0.02);
+
+      // Merge into single BufferGeometry
+      var totalVertices = 0;
+      var totalIndices = 0;
+      parts.forEach(function(p) {
+        totalVertices += p.attributes.position.count;
+        if (p.index) totalIndices += p.index.count;
+      });
+
+      var positions = new Float32Array(totalVertices * 3);
+      var normals = new Float32Array(totalVertices * 3);
+      var uvs = new Float32Array(totalVertices * 2);
+      var indices = new Uint32Array(totalIndices);
+
+      var vOffset = 0, iOffset = 0;
+      parts.forEach(function(p) {
+        var pCount = p.attributes.position.count;
+        positions.set(p.attributes.position.array, vOffset * 3);
+        if (p.attributes.normal) normals.set(p.attributes.normal.array, vOffset * 3);
+        if (p.attributes.uv) uvs.set(p.attributes.uv.array, vOffset * 2);
+
+        if (p.index) {
+          var idxArr = p.index.array;
+          for (var i = 0; i < idxArr.length; i++) {
+            indices[iOffset + i] = idxArr[i] + vOffset;
+          }
+          iOffset += idxArr.length;
+        }
+        vOffset += pCount;
+        p.dispose();
+      });
+
+      var merged = new THREE.BufferGeometry();
+      merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      merged.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+      merged.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      merged.setIndex(new THREE.BufferAttribute(indices, 1));
+
+      return merged;
+    }
+
+    // Get or Compute Subdivided Geometry with Memory Management
+    function getSubdividedGeometry(level) {
+      if (level === 0) return baseHumanoidGeom;
+      if (geometryCache[level]) return geometryCache[level];
+
+      if (window.LoopSubdivision) {
+        try {
+          var subdivided = window.LoopSubdivision.modify(baseHumanoidGeom, level, {
+            split: false,
+            uvSmooth: true,
+            preserveEdges: false
+          });
+          subdivided.computeVertexNormals();
+          geometryCache[level] = subdivided;
+          return subdivided;
+        } catch (err) {
+          console.warn('Subdivision error:', err);
+          return baseHumanoidGeom;
+        }
+      }
+      return baseHumanoidGeom;
+    }
+
+    // Update Character Geometry when Slider changes
+    function updateCharacterSubdivision(level) {
+      state.subdivLevel = level;
+      var targetGeom = getSubdividedGeometry(level);
+
+      if (currentCharacterMesh) {
+        currentCharacterMesh.geometry = targetGeom;
+      }
+      if (wireframeMesh) {
+        wireframeMesh.geometry = targetGeom;
+      }
+
+      // Update Clones if present
+      if (clonesGroup) {
+        clonesGroup.traverse(function(child) {
+          if (child.isMesh && child !== wireframeMesh) {
+            child.geometry = targetGeom;
+          }
+        });
+      }
+
+      // Update UI Telemetry
+      var triCount = targetGeom.index ? (targetGeom.index.count / 3) : (targetGeom.attributes.position.count / 3);
+      var totalTris = triCount * state.clonesCount;
+      var totalVerts = targetGeom.attributes.position.count * state.clonesCount;
+
+      document.getElementById('hud-tris').textContent = totalTris.toLocaleString();
+      document.getElementById('hud-verts').textContent = totalVerts.toLocaleString();
+      document.getElementById('hud-level').textContent = level;
+
+      var levelNames = ['Level 0 (Low-Poly)', 'Level 1 (Beveled)', 'Level 2 (Smooth)', 'Level 3 (High-Poly)', 'Level 4 (Ultra)'];
+      document.getElementById('label-subdiv-level').textContent = levelNames[level] || ('Level ' + level);
+
+      if (window.MyPC && window.MyPC.announce) {
+        window.MyPC.announce('Subdivision ' + levelNames[level] + ', ' + totalTris + ' triangles');
+      }
+    }
+
+    // Setup 3D Scene, Lights, Floor
+    function initScene() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x090d16);
+      scene.fog = new THREE.Fog(0x090d16, 12, 35);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      updateCameraPosition();
+
+      // Renderer setup
+      var canvas = document.getElementById('webgl-canvas');
+      renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: state.antialias,
+        powerPreference: 'high-performance'
+      });
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      if (renderer.outputColorSpace !== undefined) {
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+      } else {
+        renderer.outputEncoding = THREE.sRGBEncoding;
+      }
+
+      // Shadow Map configuration
+      renderer.shadowMap.enabled = state.shadowQuality !== 'off';
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      // Lights Rig
+      hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x0f172a, 0.6);
+      scene.add(hemiLight);
+
+      ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+      scene.add(ambientLight);
+
+      // Key Directional Light
+      dirLight = new THREE.DirectionalLight(0xfff1e0, 1.4);
+      dirLight.position.set(5, 9, 5);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.set(1024, 1024);
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 25;
+      dirLight.shadow.camera.left = -6;
+      dirLight.shadow.camera.right = 6;
+      dirLight.shadow.camera.top = 6;
+      dirLight.shadow.camera.bottom = -6;
+      dirLight.shadow.bias = -0.0005;
+      scene.add(dirLight);
+
+      // Rim Light for edge specular
+      rimLight = new THREE.DirectionalLight(0x38bdf8, 0.85);
+      rimLight.position.set(-5, 6, -6);
+      scene.add(rimLight);
+
+      // Circular Pedestal Platform
+      var pedestalGeom = new THREE.CylinderGeometry(4.6, 4.9, 0.35, 48);
+      var pedestalMat = new THREE.MeshStandardMaterial({
+        color: 0x111827,
+        roughness: 0.6,
+        metalness: 0.35
+      });
+      pedestalMesh = new THREE.Mesh(pedestalGeom, pedestalMat);
+      pedestalMesh.position.y = -0.175;
+      pedestalMesh.receiveShadow = true;
+      scene.add(pedestalMesh);
+
+      // Decorative concentric rings on pedestal
+      var ringGeom = new THREE.RingGeometry(2.0, 2.05, 48);
+      var ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+      var ringMesh = new THREE.Mesh(ringGeom, ringMat);
+      ringMesh.rotation.x = -Math.PI / 2;
+      ringMesh.position.y = 0.003;
+      scene.add(ringMesh);
+
+      var outerRingGeom = new THREE.RingGeometry(3.8, 3.84, 48);
+      var outerRingMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+      var outerRingMesh = new THREE.Mesh(outerRingGeom, outerRingMat);
+      outerRingMesh.rotation.x = -Math.PI / 2;
+      outerRingMesh.position.y = 0.003;
+      scene.add(outerRingMesh);
+
+      // Contact shadow plane beneath character
+      var contactGeom = new THREE.CircleGeometry(1.6, 32);
+      var contactMat = new THREE.MeshBasicMaterial({
+        color: 0x030712,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false
+      });
+      contactShadowMesh = new THREE.Mesh(contactGeom, contactMat);
+      contactShadowMesh.rotation.x = -Math.PI / 2;
+      contactShadowMesh.position.y = 0.005;
+      scene.add(contactShadowMesh);
+
+      // Generate Base Humanoid Character
+      baseHumanoidGeom = createBaseHumanoidGeometry();
+      characterGroup = new THREE.Group();
+
+      currentCharacterMesh = new THREE.Mesh(baseHumanoidGeom, materials[state.materialPreset]);
+      currentCharacterMesh.castShadow = true;
+      currentCharacterMesh.receiveShadow = true;
+      characterGroup.add(currentCharacterMesh);
+
+      wireframeMesh = new THREE.Mesh(baseHumanoidGeom, wireframeMat);
+      wireframeMesh.visible = state.wireframe;
+      characterGroup.add(wireframeMesh);
+
+      scene.add(characterGroup);
+
+      // Setup Post Processing Pipeline
+      setupPostProcessing();
+
+      // Apply initial resolution & shadow
+      applyResolution(state.targetRes);
+      applyShadowQuality(state.shadowQuality);
+    }
+
+    // Post-Processing Pipeline (Bloom & Glow Shader)
+    function setupPostProcessing() {
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      renderTarget = new THREE.WebGLRenderTarget(w, h, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat
+      });
+
+      postScene = new THREE.Scene();
+      postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+      postMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          tDiffuse: { value: null },
+          resolution: { value: new THREE.Vector2(w, h) },
+          bloomStrength: { value: 0.35 }
+        },
+        vertexShader: [
+          'varying vec2 vUv;',
+          'void main() {',
+          '  vUv = uv;',
+          '  gl_Position = vec4(position, 1.0);',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform sampler2D tDiffuse;',
+          'uniform vec2 resolution;',
+          'uniform float bloomStrength;',
+          'varying vec2 vUv;',
+          'void main() {',
+          '  vec4 col = texture2D(tDiffuse, vUv);',
+          '  vec2 offset = vec2(1.5) / resolution;',
+          '  vec4 b1 = texture2D(tDiffuse, vUv + vec2( offset.x,  offset.y));',
+          '  vec4 b2 = texture2D(tDiffuse, vUv + vec2(-offset.x,  offset.y));',
+          '  vec4 b3 = texture2D(tDiffuse, vUv + vec2( offset.x, -offset.y));',
+          '  vec4 b4 = texture2D(tDiffuse, vUv + vec2(-offset.x, -offset.y));',
+          '  vec4 blur = (b1 + b2 + b3 + b4) * 0.25;',
+          '  float lum = dot(blur.rgb, vec3(0.2126, 0.7152, 0.0722));',
+          '  vec3 glow = max(blur.rgb - 0.45, 0.0) * bloomStrength;',
+          '  vec2 uvCenter = vUv - 0.5;',
+          '  float vignette = 1.0 - dot(uvCenter, uvCenter) * 0.6;',
+          '  gl_FragColor = vec4((col.rgb + glow * 1.4) * vignette, col.a);',
+          '}'
+        ].join('\n')
+      });
+
+      var quadGeom = new THREE.PlaneGeometry(2, 2);
+      var quadMesh = new THREE.Mesh(quadGeom, postMaterial);
+      postScene.add(quadMesh);
+    }
+
+    // Apply Target Resolution (480p, 720p, 1080p, Auto)
+    function applyResolution(resKey) {
+      state.targetRes = resKey;
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+      var pr = window.devicePixelRatio || 1;
+
+      if (resKey === '480p') {
+        width = 854;
+        height = 480;
+        pr = 1;
+      } else if (resKey === '720p') {
+        width = 1280;
+        height = 720;
+        pr = 1;
+      } else if (resKey === '1080p') {
+        width = 1920;
+        height = 1080;
+        pr = 1;
+      } else {
+        // Auto (Native Window Resolution)
+        width = window.innerWidth;
+        height = window.innerHeight;
+        pr = Math.min(window.devicePixelRatio || 1, 2);
+      }
+
+      renderer.setPixelRatio(pr);
+      // setSize with 3rd param false allows CSS to stretch canvas
+      renderer.setSize(width, height, false);
+
+      if (renderTarget) {
+        renderTarget.setSize(width, height);
+        if (postMaterial) postMaterial.uniforms.resolution.value.set(width, height);
+      }
+
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      document.getElementById('hud-res').textContent = Math.round(width * pr) + '×' + Math.round(height * pr);
+      document.getElementById('label-res').textContent = resKey.toUpperCase();
+    }
+
+    // Apply Shadow Quality (Off, Low, Med, High)
+    function applyShadowQuality(quality) {
+      state.shadowQuality = quality;
+      if (quality === 'off') {
+        renderer.shadowMap.enabled = false;
+        dirLight.castShadow = false;
+      } else {
+        renderer.shadowMap.enabled = true;
+        dirLight.castShadow = true;
+
+        if (quality === 'low') {
+          renderer.shadowMap.type = THREE.BasicShadowMap;
+          dirLight.shadow.mapSize.set(512, 512);
+        } else if (quality === 'med') {
+          renderer.shadowMap.type = THREE.PCFShadowMap;
+          dirLight.shadow.mapSize.set(1024, 1024);
+        } else if (quality === 'high') {
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          dirLight.shadow.mapSize.set(2048, 2048);
+        }
+      }
+
+      if (dirLight.shadow.map) {
+        dirLight.shadow.map.dispose();
+        dirLight.shadow.map = null;
+      }
+      renderer.shadowMap.needsUpdate = true;
+      scene.traverse(function(o) {
+        if (o.isMesh && o.material) o.material.needsUpdate = true;
+      });
+
+      document.getElementById('label-shadow').textContent = quality.toUpperCase();
+    }
+
+    // Apply Anti-Aliasing (Recreates WebGL context cleanly)
+    function applyAntialias(enabled) {
+      state.antialias = enabled;
+      var canvas = document.getElementById('webgl-canvas');
+      var oldRenderer = renderer;
+
+      renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: enabled,
+        powerPreference: 'high-performance'
+      });
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      if (renderer.outputColorSpace !== undefined) {
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+      } else {
+        renderer.outputEncoding = THREE.sRGBEncoding;
+      }
+
+      applyResolution(state.targetRes);
+      applyShadowQuality(state.shadowQuality);
+      if (oldRenderer) oldRenderer.dispose();
+    }
+
+    // Update Stress Army Clones
+    function updateClonesCount(count) {
+      state.clonesCount = count;
+      document.getElementById('label-clones').textContent = count === 1 ? '1x (Solo)' : count + 'x Clones';
+
+      if (clonesGroup) {
+        scene.remove(clonesGroup);
+        clonesGroup.traverse(function(c) {
+          if (c.geometry && c.geometry !== baseHumanoidGeom && !Object.values(geometryCache).includes(c.geometry)) {
+            c.geometry.dispose();
+          }
+        });
+        clonesGroup = null;
+      }
+
+      if (count > 1) {
+        clonesGroup = new THREE.Group();
+        var curGeom = getSubdividedGeometry(state.subdivLevel);
+        var curMat = materials[state.materialPreset];
+
+        for (var i = 1; i < count; i++) {
+          var cloneMesh = new THREE.Mesh(curGeom, curMat);
+          cloneMesh.castShadow = (state.shadowQuality !== 'off');
+          cloneMesh.receiveShadow = true;
+
+          // Position in ring formation
+          var angle = (i / (count - 1)) * Math.PI * 2;
+          var radius = (count <= 10) ? 2.5 : (1.8 + (i % 2) * 1.5);
+          cloneMesh.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+          cloneMesh.scale.set(0.8, 0.8, 0.8);
+          clonesGroup.add(cloneMesh);
+        }
+        scene.add(clonesGroup);
+      }
+
+      // Update Telemetry
+      var targetGeom = getSubdividedGeometry(state.subdivLevel);
+      var triCount = targetGeom.index ? (targetGeom.index.count / 3) : (targetGeom.attributes.position.count / 3);
+      document.getElementById('hud-tris').textContent = (triCount * count).toLocaleString();
+      document.getElementById('hud-verts').textContent = (targetGeom.attributes.position.count * count).toLocaleString();
+    }
+
+    // Camera Positioning
+    function updateCameraPosition() {
+      camera.position.x = Math.sin(camAngle) * camDistance;
+      camera.position.z = Math.cos(camAngle) * camDistance;
+      camera.position.y = camElevation;
+      camera.lookAt(0, 1.6, 0);
+    }
+
+    // Main Render Loop
+    function render(timestamp) {
+      rafId = requestAnimationFrame(render);
+      if (stats) stats.begin();
+
+      var dt = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.1) : 0.016;
+      lastTime = timestamp;
+
+      // Auto Orbit
+      if (state.autoOrbit && !isDragging && !benchmark.active) {
+        camAngle += 0.35 * state.orbitSpeed * dt;
+        updateCameraPosition();
+      }
+
+      // Benchmark Choreography & FPS Tracking
+      if (benchmark.active) {
+        updateBenchmark(dt);
+      }
+
+      // Animated character breathing / idle bobbing
+      if (characterGroup) {
+        characterGroup.position.y = Math.sin(timestamp * 0.002) * 0.02;
+      }
+      if (clonesGroup) {
+        var idx = 0;
+        clonesGroup.children.forEach(function(c) {
+          c.position.y = Math.sin(timestamp * 0.0025 + idx++) * 0.025;
+        });
+      }
+
+      // Render Scene
+      if (state.postProcessing && renderTarget) {
+        renderer.setRenderTarget(renderTarget);
+        renderer.render(scene, camera);
+
+        renderer.setRenderTarget(null);
+        postMaterial.uniforms.tDiffuse.value = renderTarget.texture;
+        renderer.render(postScene, postCamera);
+      } else {
+        renderer.render(scene, camera);
+      }
+
+      // Update Draw Calls Telemetry
+      if (renderer.info) {
+        document.getElementById('hud-draws').textContent = renderer.info.render.calls;
+      }
+
+      if (stats) stats.end();
+    }
+
+    // Automated 15-second Benchmark Engine
+    function startBenchmark() {
+      if (benchmark.active) return;
+      benchmark.active = true;
+      benchmark.elapsed = 0;
+      benchmark.frameCount = 0;
+      benchmark.frameTimes = [];
+      benchmark.fpsSamples = [];
+
+      document.getElementById('benchmark-overlay').classList.add('active');
+      document.getElementById('bm-running-box').style.display = 'flex';
+      document.getElementById('bm-result-box').style.display = 'none';
+
+      if (window.MyPC && window.MyPC.announce) {
+        window.MyPC.announce('Starting GPU stress benchmark for 15 seconds');
+      }
+    }
+
+    function updateBenchmark(dt) {
+      benchmark.elapsed += dt;
+      benchmark.frameCount++;
+      var currentFps = dt > 0 ? (1 / dt) : 60;
+      benchmark.fpsSamples.push(currentFps);
+      benchmark.frameTimes.push(dt * 1000);
+
+      // Automated dynamic cinematic sweep
+      var progress = Math.min(benchmark.elapsed / benchmark.duration, 1.0);
+      document.getElementById('bm-progress-fill').style.width = (progress * 100).toFixed(1) + '%';
+      document.getElementById('bm-timer-text').textContent = (benchmark.duration - benchmark.elapsed).toFixed(1) + 's';
+      document.getElementById('bm-current-fps').textContent = 'Current: ' + currentFps.toFixed(0) + ' FPS | ' + (dt * 1000).toFixed(1) + ' ms';
+
+      // Sweep Camera
+      camAngle += 0.8 * dt;
+      camElevation = 1.8 + Math.sin(progress * Math.PI * 4) * 1.5;
+      camDistance = 6.0 + Math.cos(progress * Math.PI * 2) * 2.5;
+      updateCameraPosition();
+
+      if (benchmark.elapsed >= benchmark.duration) {
+        finishBenchmark();
+      }
+    }
+
+    function finishBenchmark() {
+      benchmark.active = false;
+      var samples = benchmark.fpsSamples.filter(function(f) { return f > 5 && f < 300; });
+      samples.sort(function(a, b) { return a - b; });
+
+      var avgFps = samples.length ? (samples.reduce(function(a, b) { return a + b; }, 0) / samples.length) : 60;
+      var minFps = samples.length ? samples[0] : 30;
+      var low1PercentIndex = Math.max(0, Math.floor(samples.length * 0.01));
+      var low1PercentFps = samples[low1PercentIndex] || minFps;
+      var avgFrameTime = avgFps > 0 ? (1000 / avgFps) : 16.6;
+
+      var targetGeom = getSubdividedGeometry(state.subdivLevel);
+      var tris = (targetGeom.index ? targetGeom.index.count / 3 : targetGeom.attributes.position.count / 3) * state.clonesCount;
+
+      // Calculate Weighted Benchmark Score
+      var score = Math.round(avgFps * 65 + low1PercentFps * 35 + (tris / 1000) * 15);
+
+      // Grade classification
+      var grade = 'S+ ULTRA PERFORMANCE';
+      var gradeClass = 'grade-s';
+      if (avgFps >= 58 && low1PercentFps >= 50) {
+        grade = 'S+ ULTRA PERFORMANCE'; gradeClass = 'grade-s';
+      } else if (avgFps >= 45) {
+        grade = 'A GAMING SMOOTH'; gradeClass = 'grade-a';
+      } else if (avgFps >= 30) {
+        grade = 'B STANDARD COMFORT'; gradeClass = 'grade-b';
+      } else {
+        grade = 'C NEEDS TUNING'; gradeClass = 'grade-c';
+      }
+
+      // Populate Result Card
+      document.getElementById('bm-final-score').textContent = score.toLocaleString();
+      var badge = document.getElementById('bm-grade-badge');
+      badge.textContent = grade;
+      badge.className = 'bm-grade-badge ' + gradeClass;
+
+      document.getElementById('bm-stat-avg').textContent = avgFps.toFixed(1);
+      document.getElementById('bm-stat-low').textContent = low1PercentFps.toFixed(1);
+      document.getElementById('bm-stat-tris').textContent = (tris > 999 ? (tris / 1000).toFixed(1) + 'k' : tris);
+      document.getElementById('bm-stat-res').textContent = state.targetRes.toUpperCase();
+      document.getElementById('bm-stat-shadow').textContent = state.shadowQuality.toUpperCase();
+      document.getElementById('bm-stat-time').textContent = avgFrameTime.toFixed(1) + 'ms';
+
+      document.getElementById('bm-running-box').style.display = 'none';
+      document.getElementById('bm-result-box').style.display = 'flex';
+
+      // Submit score to MyPC if game scores supported
+      if (window.MyPC && window.MyPC.submitScore) {
+        window.MyPC.submitScore(score);
+      }
+      if (window.MyPC && window.MyPC.announce) {
+        window.MyPC.announce('Benchmark finished. Score: ' + score + ', ' + grade);
+      }
+    }
+
+    // UI Event Handlers
+    function setupUI() {
+      // Subdivision Slider
+      var subSlider = document.getElementById('slider-subdiv');
+      subSlider.addEventListener('input', function(e) {
+        updateCharacterSubdivision(parseInt(e.target.value, 10));
+      });
+
+      // Wireframe Toggle
+      var wfToggle = document.getElementById('toggle-wireframe');
+      wfToggle.addEventListener('click', function() {
+        state.wireframe = !state.wireframe;
+        wfToggle.classList.toggle('active', state.wireframe);
+        if (wireframeMesh) wireframeMesh.visible = state.wireframe;
+      });
+
+      // Material Swatches
+      document.querySelectorAll('.swatch-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.swatch-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          var matKey = btn.dataset.mat;
+          state.materialPreset = matKey;
+          if (currentCharacterMesh) currentCharacterMesh.material = materials[matKey];
+          if (clonesGroup) {
+            clonesGroup.children.forEach(function(c) { c.material = materials[matKey]; });
+          }
+          document.getElementById('label-mat').textContent = btn.title;
+        });
+      });
+
+      // Target Resolution Buttons
+      document.querySelectorAll('#seg-res .seg-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('#seg-res .seg-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          applyResolution(btn.dataset.res);
+        });
+      });
+
+      // Shadow Quality Buttons
+      document.querySelectorAll('#seg-shadow .seg-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('#seg-shadow .seg-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          applyShadowQuality(btn.dataset.shadow);
+        });
+      });
+
+      // Anti-Aliasing Toggle
+      var aaToggle = document.getElementById('toggle-aa');
+      aaToggle.addEventListener('click', function() {
+        applyAntialias(!state.antialias);
+        aaToggle.classList.toggle('active', state.antialias);
+      });
+
+      // Post-Processing Toggle
+      var postToggle = document.getElementById('toggle-post');
+      postToggle.addEventListener('click', function() {
+        state.postProcessing = !state.postProcessing;
+        postToggle.classList.toggle('active', state.postProcessing);
+      });
+
+      // Clones Army Slider
+      var clonesSlider = document.getElementById('slider-clones');
+      clonesSlider.addEventListener('input', function(e) {
+        updateClonesCount(parseInt(e.target.value, 10));
+      });
+
+      // Auto Orbit Toggle
+      var orbitToggle = document.getElementById('toggle-orbit');
+      orbitToggle.addEventListener('click', function() {
+        state.autoOrbit = !state.autoOrbit;
+        orbitToggle.classList.toggle('active', state.autoOrbit);
+      });
+
+      // Orbit Speed Slider
+      var speedSlider = document.getElementById('slider-speed');
+      speedSlider.addEventListener('input', function(e) {
+        state.orbitSpeed = parseFloat(e.target.value);
+        document.getElementById('label-speed').textContent = state.orbitSpeed.toFixed(1) + 'x';
+      });
+
+      // Reset Camera
+      document.getElementById('btn-reset-cam').addEventListener('click', function() {
+        camDistance = 7.8;
+        camAngle = 0.6;
+        camElevation = 2.4;
+        updateCameraPosition();
+      });
+
+      // Benchmark Triggers
+      document.getElementById('btn-start-benchmark').addEventListener('click', startBenchmark);
+      document.getElementById('btn-rerun-bm').addEventListener('click', startBenchmark);
+      document.getElementById('btn-close-bm').addEventListener('click', function() {
+        document.getElementById('benchmark-overlay').classList.remove('active');
+      });
+
+      // Toggle HUD Cinema Mode
+      function toggleHud() {
+        state.hudVisible = !state.hudVisible;
+        document.getElementById('control-panel').classList.toggle('hidden', !state.hudVisible);
+        document.getElementById('telemetry-bar').style.display = state.hudVisible ? 'flex' : 'none';
+        document.getElementById('stats-container').style.display = state.hudVisible ? 'block' : 'none';
+        document.getElementById('toggle-hud-btn').innerHTML = state.hudVisible ? '<span>👁 Hide HUD (H)</span>' : '<span>👁 Show HUD (H)</span>';
+      }
+
+      document.getElementById('toggle-hud-btn').addEventListener('click', toggleHud);
+      document.getElementById('btn-close-hud').addEventListener('click', toggleHud);
+
+      // Window Resize Listener
+      window.addEventListener('resize', function() {
+        applyResolution(state.targetRes);
+      });
+
+      // Mouse & Touch Orbit Drag Controls
+      var canvas = document.getElementById('webgl-canvas');
+      canvas.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        previousMouseX = e.clientX;
+        previousMouseY = e.clientY;
+      });
+      window.addEventListener('mouseup', function() { isDragging = false; });
+      window.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        var deltaX = e.clientX - previousMouseX;
+        var deltaY = e.clientY - previousMouseY;
+        camAngle -= deltaX * 0.008;
+        camElevation = Math.max(0.5, Math.min(8.0, camElevation + deltaY * 0.015));
+        updateCameraPosition();
+        previousMouseX = e.clientX;
+        previousMouseY = e.clientY;
+      });
+
+      canvas.addEventListener('wheel', function(e) {
+        camDistance = Math.max(3.0, Math.min(16.0, camDistance + e.deltaY * 0.005));
+        updateCameraPosition();
+      }, { passive: true });
+
+      // Touch events for mobile and Smart TV pointers
+      var touchStartX = 0, touchStartY = 0;
+      canvas.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+      canvas.addEventListener('touchend', function() { isDragging = false; });
+      canvas.addEventListener('touchmove', function(e) {
+        if (!isDragging || e.touches.length !== 1) return;
+        var deltaX = e.touches[0].clientX - touchStartX;
+        var deltaY = e.touches[0].clientY - touchStartY;
+        camAngle -= deltaX * 0.008;
+        camElevation = Math.max(0.5, Math.min(8.0, camElevation + deltaY * 0.015));
+        updateCameraPosition();
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      // Keyboard Controls (Standalone & Smart TV fallback)
+      window.addEventListener('keydown', function(e) {
+        if (e.key === 'h' || e.key === 'H') {
+          toggleHud();
+        } else if (e.key === 'b' || e.key === 'B') {
+          startBenchmark();
+        } else if (e.key === 'w' || e.key === 'W') {
+          wfToggle.click();
+        } else if (e.key === 'Escape') {
+          var bmOverlay = document.getElementById('benchmark-overlay');
+          if (bmOverlay.classList.contains('active')) {
+            bmOverlay.classList.remove('active');
+          } else {
+            toggleHud();
+          }
+        }
+      });
+    }
+
+    // TV Remote & Gamepad Controller Management
+    function setupTVAndGamepadControls() {
+      var focusItems = Array.from(document.querySelectorAll('.ctrl-item'));
+      var currentFocusIndex = 0;
+
+      function updateFocus(idx) {
+        if (focusItems.length === 0) return;
+        currentFocusIndex = (idx + focusItems.length) % focusItems.length;
+        focusItems[currentFocusIndex].focus();
+      }
+
+      // MyPC Input Adapter
+      function handleAction(action) {
+        if (action === 'up') {
+          updateFocus(currentFocusIndex - 1);
+        } else if (action === 'down') {
+          updateFocus(currentFocusIndex + 1);
+        } else if (action === 'left') {
+          var focused = document.activeElement;
+          if (focused && focused.type === 'range') {
+            focused.value = Math.max(parseFloat(focused.min), parseFloat(focused.value) - parseFloat(focused.step));
+            focused.dispatchEvent(new Event('input'));
+          } else {
+            camAngle -= 0.15;
+            updateCameraPosition();
+          }
+        } else if (action === 'right') {
+          var focused = document.activeElement;
+          if (focused && focused.type === 'range') {
+            focused.value = Math.min(parseFloat(focused.max), parseFloat(focused.value) + parseFloat(focused.step));
+            focused.dispatchEvent(new Event('input'));
+          } else {
+            camAngle += 0.15;
+            updateCameraPosition();
+          }
+        } else if (action === 'confirm' || action === 'jump') {
+          var focused = document.activeElement;
+          if (focused) focused.click();
+        } else if (action === 'cancel') {
+          document.getElementById('toggle-hud-btn').click();
+        }
+      }
+
+      // Setup MyPC SDK Integration
+      if (window.MyPC) {
+        window.MyPC.init({
+          onInit: function(info) {
+            console.log('MyPC Initialized, lang:', info.lang);
+            window.MyPC.setMenu([
+              { id: 'benchmark', label: 'Run Benchmark' },
+              { id: 'res_1080', label: 'Set 1080p' },
+              { id: 'res_720', label: 'Set 720p' },
+              { id: 'reset_cam', label: 'Reset Camera' }
+            ]);
+            window.MyPC.ready();
+          },
+          onStart: function() {
+            if (!rafId) rafId = requestAnimationFrame(render);
+          },
+          onPause: function() {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = 0;
+          },
+          onResume: function() {
+            if (!rafId) {
+              lastTime = 0;
+              rafId = requestAnimationFrame(render);
+            }
+          },
+          onDestroy: function() {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = 0;
+            if (renderer) renderer.dispose();
+            if (baseHumanoidGeom) baseHumanoidGeom.dispose();
+            Object.values(geometryCache).forEach(function(g) { g.dispose(); });
+          },
+          onInput: function(action, pressed, repeat) {
+            if (pressed) handleAction(action);
+          },
+          onMenu: function(id) {
+            if (id === 'benchmark') startBenchmark();
+            if (id === 'res_1080') applyResolution('1080p');
+            if (id === 'res_720') applyResolution('720p');
+            if (id === 'reset_cam') document.getElementById('btn-reset-cam').click();
+          }
+        });
+
+        // Gamepad controller support
+        if (window.MyPC.gamepad) {
+          window.MyPC.gamepad.on('button', function(i, pressed, val, dev, name) {
+            if (!pressed) return;
+            if (name === 'A') handleAction('confirm');
+            else if (name === 'B') handleAction('cancel');
+            else if (name === 'X') startBenchmark();
+            else if (name === 'Y') document.getElementById('toggle-wireframe').click();
+            else if (name === 'Up') handleAction('up');
+            else if (name === 'Down') handleAction('down');
+            else if (name === 'Left') handleAction('left');
+            else if (name === 'Right') handleAction('right');
+          });
+
+          // Right analog stick controls camera orbit
+          window.MyPC.gamepad.on('axes', function(axes) {
+            if (axes.length >= 4) {
+              var rx = axes[2];
+              var ry = axes[3];
+              if (Math.abs(rx) > 0.15) {
+                camAngle += rx * 0.04;
+                updateCameraPosition();
+              }
+              if (Math.abs(ry) > 0.15) {
+                camElevation = Math.max(0.5, Math.min(8.0, camElevation - ry * 0.05));
+                updateCameraPosition();
+              }
+            }
+          });
+        }
+      } else {
+        // Standalone fallback: start render loop immediately
+        rafId = requestAnimationFrame(render);
+      }
+    }
+
+    // App Initialization
+    function initApp() {
+      initStats();
+      initScene();
+      setupUI();
+      setupTVAndGamepadControls();
+      updateCharacterSubdivision(0);
+
+      // Start rendering loop if not handled by MyPC
+      if (!window.MyPC && !rafId) {
+        rafId = requestAnimationFrame(render);
+      }
+    }
+
+    // Trigger on DOM Ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  })();
+  </script>
+</body>
+</html>
